@@ -1,59 +1,60 @@
-<!DOCTYPE html>
-<html lang="it">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>DEBUG Classifica Giocatori</title>
-<style>
-  body { font-family: Arial, sans-serif; padding: 20px; }
-  pre { background: #f0f0f0; padding: 10px; border: 1px solid #ccc; white-space: pre-wrap; }
-</style>
-</head>
-<body>
-
-<h1>Classifica Giocatori (MODALITÀ DEBUG)</h1>
-<div id="debugOutput">Caricamento in corso...</div>
-
 <script>
+// Percorso relativo
 const csvUrl = "Classifica.csv"; 
 
 fetch(csvUrl)
-  .then(response => {
+  .then(response => {
     if (!response.ok) {
-        throw new Error(`Errore HTTP: ${response.status}. Controlla la console Network (F12).`);
+        // Se non trova il file 
+        throw new Error(`File non trovato (Status: ${response.status}).`);
     }
     return response.text();
   })
-  .then(data => {
-    // 1. Mostra i dati grezzi letti
-    document.getElementById("debugOutput").innerHTML = "<h2>Dati Grezzi (testo letto):</h2>";
-    document.getElementById("debugOutput").innerHTML += `<pre>${data}</pre>`;
-    
-    // 2. Tenta il parsing con il punto e virgola
-    try {
-        const rows = data.split("\n").map(r => r.split(";")); 
+  .then(data => {
+    // 1. Divide le righe per riga (gestendo sia \n che \r\n) e poi per punto e virgola (;)
+    let rows = data.split(/\r?\n/).map(r => r.split(";")); 
 
-        document.getElementById("debugOutput").innerHTML += "<h2>Risultato Parsing (Array JS):</h2>";
-        document.getElementById("debugOutput").innerHTML += `<pre>${JSON.stringify(rows, null, 2)}</pre>`;
-        
-        // Controlla se l'array risultante è ragionevole (deve avere più di una riga o delle colonne)
-        if (rows.length > 1 && rows[0].length > 1) {
-            document.getElementById("debugOutput").innerHTML += "✅ Dati letti e analizzati correttamente! Il problema è nella logica della tabella.";
-        } else {
-             document.getElementById("debugOutput").innerHTML += "❌ ATTENZIONE: Il parsing ha prodotto un array troppo piccolo o vuoto. Potrebbe esserci un problema con l'encoding o con righe vuote iniziali.";
-        }
-        
-    } catch(e) {
-        document.getElementById("debugOutput").innerHTML += "<h2>Errore nel Parsing:</h2>";
-        document.getElementById("debugOutput").innerHTML += `<pre>${e.message}</pre>`;
+    // 2. Filtra tutte le righe completamente vuote (quelle con solo ";;;;;...")
+    rows = rows.filter(r => r.some(cell => cell.trim().length > 0));
+
+    // Dati validi devono avere almeno un'intestazione e una riga di dati
+    if (rows.length < 2) {
+        document.getElementById("dataTable").innerHTML = "<caption>Nessun dato valido nel CSV o file troppo corto.</caption>";
+        return;
     }
-
-  })
-  .catch(err => {
-    console.error("Errore FATALE di caricamento CSV:", err);
-    document.getElementById("debugOutput").innerHTML = `<caption>Errore FATALE: ${err.message}. Controlla la Console (F12).</caption>`;
+    
+    // 3. L'intestazione (prima riga) inizia con una cella vuota, la ignoriamo.
+    // Usiamo solo le intestazioni dalla seconda cella in poi (indice 1)
+    const headers = rows[0].slice(1).map(h => h.trim()); 
+    
+    let html = "<thead><tr>";
+    headers.forEach(h => { html += "<th>" + h + "</th>"; });
+    html += "</tr></thead><tbody>";
+    
+    // 4. Scrive le righe di dati (dalla riga 1)
+    for(let i=1; i<rows.length; i++){
+      html += "<tr>";
+      
+      // Inizia dalla seconda cella della riga di dati (indice 1) per ignorare la colonna vuota iniziale
+      const dataCells = rows[i].slice(1);
+      
+      // Scrive le celle fino a coprire tutte le intestazioni
+      dataCells.forEach(cell => {
+          html += "<td>" + cell.trim() + "</td>";
+      });
+      
+      html += "</tr>";
+    }
+    html += "</tbody>";
+    
+    document.getElementById("dataTable").innerHTML = html;
+  })
+  .catch(err => {
+    console.error("Errore caricamento CSV (Dettagli in Console):", err);
+    document.getElementById("dataTable").innerHTML = `<caption>Errore nel caricamento dei dati: ${err.message}.</caption>`;
   });
 </script>
 
 </body>
+
 </html>
